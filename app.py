@@ -29,7 +29,7 @@ def show_disclaimer():
     """)
 
 # 4. 页面头部
-st.title("🏗️ LIFT 工程机械行业诚信登记平台")
+st.title("柬埔寨工程机械行业诚信登记平台")
 st.info("本页面信息由群友自发提供，提交后将立即在下方公示。")
 show_disclaimer()
 
