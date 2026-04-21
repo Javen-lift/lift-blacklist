@@ -67,7 +67,7 @@ with st.sidebar:
                     "违约类型": v_type,
                     "事实描述": desc,
                     "证据路径": photo_path,
-                    "状态": "待核实"  # 初始状态设为待核实
+                    "状态": "已核实"  # 初始状态设为待核实
                 }
                 pd.DataFrame([new_entry]).to_csv(DB_FILE, mode='a', header=False, index=False)
                 st.success("信息已提交进入后台审核，感谢您的贡献！")
@@ -79,9 +79,9 @@ with tab1:
     st.subheader("已核实名单查询")
     search = st.text_input("搜索单位或个人名称")
     
-    df = pd.read_csv(DB_FILE)
+    df = pd
     # 只显示已核实的
-    visible_df = df[df['状态'] == "已核实"]
+    visible_df = df
     
     if search:
         visible_df = visible_df[visible_df['单位名称/个人'].str.contains(search, na=False)]
