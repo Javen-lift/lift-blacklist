@@ -1,0 +1,111 @@
+import streamlit as st
+import pandas as pd
+from datetime import datetime
+import os
+from PIL import Image
+
+# 1. 基础配置与路径设置
+st.set_page_config(page_title="LIFT 行业诚信互助平台", layout="wide")
+DB_FILE = "blacklist_v2.csv"
+UPLOAD_DIR = "evidence_photos"
+
+if not os.path.exists(UPLOAD_DIR):
+    os.makedirs(UPLOAD_DIR)
+
+# 初始化数据库
+if not os.path.exists(DB_FILE):
+    df = pd.DataFrame(columns=["ID", "登记时间", "单位名称/个人", "违约类型", "事实描述", "证据路径", "状态"])
+    df.to_csv(DB_FILE, index=False)
+
+# 2. 法律合规声明 (弹窗)
+@st.cache_data
+def show_disclaimer():
+    st.warning("""
+    **⚖️ 法律声明与使用须知**：
+    1. 本平台仅用于工程机械行业内部诚信交流，旨在维护行业秩序。
+    2. 提交者需对信息的**真实性**负全部法律责任。严禁恶意诽谤、虚假举报。
+    3. 平台仅作为信息记录，不代表 LIFT 公司对任何单位的最终评价。
+    4. 提交的信息将进入“后台审核”状态，经核实后方可公开显示。
+    """)
+
+# 3. 页面头部
+st.title("🏗️ 工程机械行业诚信互助登记表")
+show_disclaimer()
+
+# --- 侧边栏：匿名登记入口 ---
+with st.sidebar:
+    st.header("🖊️ 匿名登记举报")
+    with st.form("blacklist_form", clear_on_submit=True):
+        target = st.text_input("被举报对象 (公司名或姓名)", placeholder="必填")
+        v_type = st.selectbox("违约类型", ["拖欠租金", "恶意损坏/偷换配件", "违约放鸽子", "中介/个人失信", "其他"])
+        desc = st.text_area("详细事实经过", help="请务必客观描述时间、地点、金额等关键要素")
+        
+        # 照片上传功能
+        uploaded_file = st.file_uploader("上传照片证据 (如合同截图、欠条、现场照片)", type=['png', 'jpg', 'jpeg'])
+        
+        agreement = st.checkbox("我承诺以上信息真实，并愿承担相应法律后果")
+        submit = st.form_submit_button("提交登记")
+
+        if submit:
+            if not target or not agreement:
+                st.error("请完整填写必要信息并勾选承诺声明。")
+            else:
+                # 处理图片保存
+                photo_path = "无照片"
+                if uploaded_file is not None:
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    photo_path = os.path.join(UPLOAD_DIR, f"{timestamp}_{uploaded_file.name}")
+                    with open(photo_path, "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                
+                # 写入数据
+                new_id = datetime.now().strftime("%Y%m%d%H%M%S")
+                new_entry = {
+                    "ID": new_id,
+                    "登记时间": datetime.now().strftime("%Y-%m-%d"),
+                    "单位名称/个人": target,
+                    "违约类型": v_type,
+                    "事实描述": desc,
+                    "证据路径": photo_path,
+                    "状态": "待核实"  # 初始状态设为待核实
+                }
+                pd.DataFrame([new_entry]).to_csv(DB_FILE, mode='a', header=False, index=False)
+                st.success("信息已提交进入后台审核，感谢您的贡献！")
+
+# --- 主界面：查询与展示 ---
+tab1, tab2 = st.tabs(["🔍 黑名单公示区", "🛡️ LIFT 诚信建议"])
+
+with tab1:
+    st.subheader("已核实名单查询")
+    search = st.text_input("搜索单位或个人名称")
+    
+    df = pd.read_csv(DB_FILE)
+    # 只显示已核实的
+    visible_df = df[df['状态'] == "已核实"]
+    
+    if search:
+        visible_df = visible_df[visible_df['单位名称/个人'].str.contains(search, na=False)]
+    
+    if not visible_df.empty:
+        for index, row in visible_df.iterrows():
+            with st.expander(f"🚩 {row['单位名称/个人']} - {row['违约类型']}"):
+                col1, col2 = st.columns([2, 1])
+                with col1:
+                    st.write(f"**登记日期**: {row['登记时间']}")
+                    st.write(f"**事实描述**: {row['事实描述']}")
+                with col2:
+                    if row['证据路径'] != "无照片" and os.path.exists(row['证据路径']):
+                        img = Image.open(row['证据路径'])
+                        st.image(img, caption="证据照片", use_column_width=True)
+                    else:
+                        st.info("该条目未上传照片证明")
+    else:
+        st.info("暂无符合条件的核实记录。")
+
+with tab2:
+    st.info("""
+    **💡 给群友的建议：**
+    - 合作前先搜一搜。
+    - 尽量签署正规合同，保留微信沟通记录。
+    - 如果您是吊装同行，遇到大型项目建议要求一定比例的预付款。
+    """)
